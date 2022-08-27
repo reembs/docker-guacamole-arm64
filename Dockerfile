@@ -1,41 +1,34 @@
 FROM tomcat:9-jre17-temurin-jammy
 
-ENV ARCH=aarch64 \
-  GUAC_VER=1.3.0 \
-  GUACAMOLE_HOME=/app/guacamole \
-  PG_MAJOR=13 \
-  PGDATA=/config/postgres \
-  POSTGRES_USER=guacamole \
-  POSTGRES_DB=guacamole_db
-
-ARG S6_OVERLAY_VERSION=3.1.0.1
-
-RUN apt-get update && apt-get install -y xz-utils
-
-ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
-RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz
-ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${ARCH}.tar.xz /tmp
-RUN tar -C / -Jxpf /tmp/s6-overlay-${ARCH}.tar.xz
-
-RUN mkdir -p ${GUACAMOLE_HOME} \
-    ${GUACAMOLE_HOME}/lib \
-    ${GUACAMOLE_HOME}/extensions
-
-WORKDIR ${GUACAMOLE_HOME}
-
 # Install dependencies
 RUN apt-get update && apt-get install -y \
     libcairo2 libturbojpeg libpng-dev \
     libossp-uuid-dev libavcodec-dev libavutil-dev \
     libswscale-dev freerdp2-dev libfreerdp-client2-2 libpango1.0 \
     libssh2-1 libtelnet-dev libvncserver-dev \
-    libpulse-dev libssl-dev libvorbis-dev libwebp-dev libwebsockets-dev \ 
-    ghostscript postgresql build-essential \
+    libpulse-dev libssl-dev libvorbis-dev libwebp-dev libwebsockets-dev \
+    ghostscript postgresql build-essential xz-utils \
   && rm -rf /var/lib/apt/lists/*
 
-# Link FreeRDP to where guac expects it to be
-RUN [ "$ARCH" = "armhf" ] && ln -s /usr/local/lib/freerdp /usr/lib/arm-linux-gnueabihf/freerdp || exit 0
-RUN [ "$ARCH" = "amd64" ] && ln -s /usr/local/lib/freerdp /usr/lib/x86_64-linux-gnu/freerdp || exit 0
+ENV ARCH=aarch64
+ARG S6_OVERLAY_VERSION=3.1.0.1
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
+RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${ARCH}.tar.xz /tmp
+RUN tar -C / -Jxpf /tmp/s6-overlay-${ARCH}.tar.xz
+
+ENV GUAC_VER=1.4.0 \
+    GUACAMOLE_HOME=/app/guacamole \
+    PG_MAJOR=14 \
+    PGDATA=/config/postgres \
+    POSTGRES_USER=guacamole \
+    POSTGRES_DB=guacamole_db
+
+RUN mkdir -p ${GUACAMOLE_HOME} \
+    ${GUACAMOLE_HOME}/lib \
+    ${GUACAMOLE_HOME}/extensions
+
+WORKDIR ${GUACAMOLE_HOME}
 
 # Install guacamole-server
 RUN curl -SLO "http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${GUAC_VER}/source/guacamole-server-${GUAC_VER}.tar.gz" \
