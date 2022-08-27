@@ -10,23 +10,20 @@ RUN apt-get update && apt-get install -y \
     ghostscript postgresql build-essential xz-utils \
   && rm -rf /var/lib/apt/lists/*
 
-ENV ARCH=aarch64
-ARG S6_OVERLAY_VERSION=3.1.0.1
-ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
-RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz
-ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${ARCH}.tar.xz /tmp
-RUN tar -C / -Jxpf /tmp/s6-overlay-${ARCH}.tar.xz
-
-ENV GUAC_VER=1.4.0 \
+ENV ARCH=aarch64 \
+    GUAC_VER=1.4.0 \
     GUACAMOLE_HOME=/app/guacamole \
     PG_MAJOR=14 \
     PGDATA=/config/postgres \
     POSTGRES_USER=guacamole \
-    POSTGRES_DB=guacamole_db
+    POSTGRES_DB=guacamole_db \
+    S6_OVERLAY_VERSION=3.1.0.1
 
-RUN mkdir -p ${GUACAMOLE_HOME} \
-    ${GUACAMOLE_HOME}/lib \
-    ${GUACAMOLE_HOME}/extensions
+RUN curl -sLo /tmp/s6-overlay-noarch.tar.xz https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz && \
+    tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
+    curl -sLo /tmp/s6-overlay-${ARCH}.tar.xz https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${ARCH}.tar.xz && \
+    tar -C / -Jxpf /tmp/s6-overlay-${ARCH}.tar.xz && \
+    mkdir -p ${GUACAMOLE_HOME} ${GUACAMOLE_HOME}/lib ${GUACAMOLE_HOME}/extensions
 
 WORKDIR ${GUACAMOLE_HOME}
 
