@@ -1,4 +1,4 @@
-FROM tomcat:9-jre17-temurin-jammy
+FROM tomcat:9-jdk21
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
@@ -11,12 +11,8 @@ RUN apt-get update && apt-get install -y \
   && rm -rf /var/lib/apt/lists/*
 
 ENV ARCH=aarch64 \
-    GUAC_VER=1.4.0 \
+    GUAC_VER=1.5.5 \
     GUACAMOLE_HOME=/app/guacamole \
-    PG_MAJOR=14 \
-    PGDATA=/config/postgres \
-    POSTGRES_USER=guacamole \
-    POSTGRES_DB=guacamole_db \
     S6_OVERLAY_VERSION=3.1.0.1
 
 RUN curl -sLo /tmp/s6-overlay-noarch.tar.xz https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz && \
@@ -28,7 +24,7 @@ RUN curl -sLo /tmp/s6-overlay-noarch.tar.xz https://github.com/just-containers/s
 WORKDIR ${GUACAMOLE_HOME}
 
 # Install guacamole-server
-RUN curl -SLO "http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${GUAC_VER}/source/guacamole-server-${GUAC_VER}.tar.gz" \
+RUN curl -sSLo guacamole-server-${GUAC_VER}.tar.gz "http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${GUAC_VER}/source/guacamole-server-${GUAC_VER}.tar.gz" \
   && tar -xzf guacamole-server-${GUAC_VER}.tar.gz \
   && cd guacamole-server-${GUAC_VER} \
   && ./configure --enable-allow-freerdp-snapshots \
@@ -39,28 +35,32 @@ RUN curl -SLO "http://apache.org/dyn/closer.cgi?action=download&filename=guacamo
   && ldconfig
 
 # Install guacamole-client and postgres auth adapter
-RUN set -x \
-  && rm -rf ${CATALINA_HOME}/webapps/ROOT \
-  && curl -SLo ${CATALINA_HOME}/webapps/ROOT.war "http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${GUAC_VER}/binary/guacamole-${GUAC_VER}.war" \
-  && curl -SLo ${GUACAMOLE_HOME}/lib/postgresql-42.1.4.jar "https://jdbc.postgresql.org/download/postgresql-42.1.4.jar" \
-  && curl -SLO "http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${GUAC_VER}/binary/guacamole-auth-jdbc-${GUAC_VER}.tar.gz" \
+RUN rm -rf ${CATALINA_HOME}/webapps/ROOT \
+  && curl -sSLo ${CATALINA_HOME}/webapps/ROOT.war "http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${GUAC_VER}/binary/guacamole-${GUAC_VER}.war" \
+  && curl -sSLo ${GUACAMOLE_HOME}/lib/postgresql-42.1.4.jar "https://jdbc.postgresql.org/download/postgresql-42.1.4.jar" \
+  && curl -sSLo guacamole-auth-jdbc-${GUAC_VER}.tar.gz "http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${GUAC_VER}/binary/guacamole-auth-jdbc-${GUAC_VER}.tar.gz" \
   && tar -xzf guacamole-auth-jdbc-${GUAC_VER}.tar.gz \
   && cp -R guacamole-auth-jdbc-${GUAC_VER}/postgresql/guacamole-auth-jdbc-postgresql-${GUAC_VER}.jar ${GUACAMOLE_HOME}/extensions/ \
   && cp -R guacamole-auth-jdbc-${GUAC_VER}/postgresql/schema ${GUACAMOLE_HOME}/ \
   && rm -rf guacamole-auth-jdbc-${GUAC_VER} guacamole-auth-jdbc-${GUAC_VER}.tar.gz
 
-# Add optional extensions
-RUN set -xe \
-  && mkdir ${GUACAMOLE_HOME}/extensions-available \
-  && for i in auth-ldap auth-duo auth-header auth-cas auth-openid auth-quickconnect auth-totp; do \
-    echo "http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${GUAC_VER}/binary/guacamole-${i}-${GUAC_VER}.tar.gz" \
-    && curl -SLO "http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${GUAC_VER}/binary/guacamole-${i}-${GUAC_VER}.tar.gz" \
-    && tar -xzf guacamole-${i}-${GUAC_VER}.tar.gz \
-    && cp guacamole-${i}-${GUAC_VER}/guacamole-${i}-${GUAC_VER}.jar ${GUACAMOLE_HOME}/extensions-available/ \
-    && rm -rf guacamole-${i}-${GUAC_VER} guacamole-${i}-${GUAC_VER}.tar.gz \
-  ;done
+
+ENV PG_MAJOR=16 \
+    PGDATA=/config/postgres \
+    POSTGRES_USER=guacamole \
+    POSTGRES_DB=guacamole_db
 
 ENV PATH=/usr/lib/postgresql/${PG_MAJOR}/bin:$PATH
+
+# Add optional extensions
+RUN mkdir ${GUACAMOLE_HOME}/extensions-available \
+  && for i in auth-duo auth-header auth-json auth-ldap auth-quickconnect auth-totp history-recording-storage; do \
+    curl -fsSLo "guacamole-${i}-${GUAC_VER}.tar.gz" "http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${GUAC_VER}/binary/guacamole-${i}-${GUAC_VER}.tar.gz" \
+    && tar -xzf "guacamole-${i}-${GUAC_VER}.tar.gz" \
+    && cp "guacamole-${i}-${GUAC_VER}/guacamole-${i}-${GUAC_VER}.jar" "${GUACAMOLE_HOME}/extensions-available/" \
+    && rm -rf "guacamole-${i}-${GUAC_VER}" "guacamole-${i}-${GUAC_VER}.tar.gz" \
+  ;done
+
 ENV GUACAMOLE_HOME=/config/guacamole
 
 WORKDIR /config
